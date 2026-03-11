@@ -124,7 +124,7 @@ async def show_contacts(callback: types.CallbackQuery):
     await callback.answer()
 
 
-    @dp.callback_query(F.data.startswith("pr:"))
+@dp.callback_query(F.data.startswith("pr:"))
 async def price_detail(callback: types.CallbackQuery):
     cat = callback.data.split(":")[1]
     res = "Данные обновляются..."
