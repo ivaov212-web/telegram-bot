@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 # --- КОНФИГУРАЦИЯ ---
-TOKEN = import os
+import os
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = 6807542444  # Твой ID для получения заявок
 
