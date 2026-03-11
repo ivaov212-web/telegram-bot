@@ -4,6 +4,8 @@ from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.exceptions import TelegramBadRequest  # <--- ЭТО ОБЯЗАТЕЛЬНО ДОБАВИТЬ
+
 
 # --- КОНФИГУРАЦИЯ ---
 import os
@@ -100,7 +102,29 @@ async def show_tech(callback: types.CallbackQuery):
 async def show_price(callback: types.CallbackQuery):
     await callback.message.edit_text("<b>💰 КАТЕГОРИИ УСЛУГ</b>", reply_markup=price_kb(), parse_mode="HTML")
 
-@dp.callback_query(F.data.startswith("pr:"))
+@dp.callback_query(F.data == "menu_contacts")
+async def show_contacts(callback: types.CallbackQuery):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
+    kb.button(text="⬅️ Назад", callback_data="to_main")
+    kb.adjust(1)
+    
+    text = (
+        "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
+        "г. Донецк, пр-т Ильича, 17в\n"
+        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n"
+        "📞 <b>Телефон:</b> +7 (949) 307-15-85\n\n"
+        "Вы можете записаться через квиз или написать нам напрямую."
+    )
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+    except TelegramBadRequest:
+        pass
+    await callback.answer()
+
+
+    @dp.callback_query(F.data.startswith("pr:"))
 async def price_detail(callback: types.CallbackQuery):
     cat = callback.data.split(":")[1]
     res = "Данные обновляются..."
