@@ -384,37 +384,32 @@ async def quiz_final(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("✅ Данные получены! Куратор клиники свяжется с вами.", reply_markup=main_kb())
 
-# --- ПЕРЕПИСКА С АДМИНОМ ---
+# --- ЕДИНЫЙ ОБРАБОТЧИК (КЛИЕНТ <-> АДМИН) ---
 
-# 1. КЛИЕНТ -> АДМИН (только текст, не команды, не ответы)
-@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444, F.text, ~F.text.startswith('/'), ~F.reply_to_message)
-async def forward_to_admin(message: types.Message):
-    await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
-    await bot.send_message(
-        6807542444,
-        f"📩 <b>Сообщение от клиента!</b>\nИмя: {message.from_user.full_name}\nID: <code>{message.from_user.id}</code>",
-        parse_mode="HTML"
-    )
-    await message.forward(chat_id=6807542444)
-
-# 2. АДМИН -> КЛИЕНТ (ответ через Reply)
-@dp.message(F.from_user.id == 6807542444, F.reply_to_message)
-async def reply_to_user(message: types.Message):
-    if message.reply_to_message.forward_from:
-        user_id = message.reply_to_message.forward_from.id
-    else:
+@dp.message(F.chat.type == "private")
+async def admin_chat_bridge(message: types.Message, state: FSMContext):
+    # 1. ОТВЕТ АДМИНА КЛИЕНТУ (через Reply)
+    if message.from_user.id == 6807542444 and message.reply_to_message:
         try:
-            text = message.reply_to_message.text
-            user_id = int(text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
-        except:
-            await message.answer("❌ Не могу определить ID клиента.")
-            return
+            # Пытаемся достать ID клиента из сообщения, на которое отвечаем
+            if message.reply_to_message.forward_from:
+                user_id = message.reply_to_message.forward_from.id
+            else:
+                user_id = int(message.reply_to_message.text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
+            
+            await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
+            await message.answer("✅ Ответ отправлен!")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка отправки: {e}")
+        return # Важно: прерываем выполнение, чтобы не идти дальше
 
-    try:
-        await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
-        await message.answer("✅ Ответ отправлен.")
-    except Exception as e:
-        await message.answer(f"❌ Ошибка: {e}")
+    # 2. ПЕРЕСЫЛКА КЛИЕНТА АДМИНУ
+    # Мы пересылаем, ТОЛЬКО если клиент НЕ в квизе (state is None)
+    current_state = await state.get_state()
+    if message.from_user.id != 6807542444 and current_state is None and not message.text.startswith('/'):
+        await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
+        await message.forward(chat_id=6807542444)
+
 
 
 
