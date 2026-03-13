@@ -384,12 +384,12 @@ async def quiz_final(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("✅ Данные получены! Куратор клиники свяжется с вами.", reply_markup=main_kb())
 
-# КЛИЕНТ -> АДМИН (Пересылка сообщений тебе)
-@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444)
+# 1. КЛИЕНТ -> АДМИН
+@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444, F.text, ~F.text.startswith('/'), ~F.reply_to_message)
 async def forward_to_admin(message: types.Message):
     await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
     
-    # Пересылаем сообщение админу с данными клиента
+    # Отправляем тебе данные, кто написал
     await bot.send_message(
         6807542444,
         f"📩 <b>Сообщение от клиента!</b>\n"
@@ -397,23 +397,22 @@ async def forward_to_admin(message: types.Message):
         f"ID: <code>{message.from_user.id}</code>",
         parse_mode="HTML"
     )
+    # Пересылаем само сообщение (чтобы видеть оригинал)
     await message.forward(chat_id=6807542444)
 
-# АДМИН -> КЛИЕНТ (Ответ на сообщение через Reply)
+# 2. АДМИН -> КЛИЕНТ (ответ через Reply)
 @dp.message(F.from_user.id == 6807542444, F.reply_to_message)
 async def reply_to_user(message: types.Message):
-    # 1. Если сообщение переслано официально
+    # Пытаемся найти ID
     if message.reply_to_message.forward_from:
         user_id = message.reply_to_message.forward_from.id
-    
-    # 2. Если пересылки нет, пытаемся вытащить ID из текста (например, там написано "ID: 1234567")
     else:
         try:
             # Ищем ID в тексте сообщения, на которое отвечаем
             text = message.reply_to_message.text
             user_id = int(text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
         except:
-            await message.answer("❌ Не могу найти ID. Ответьте на сообщение, где есть текст 'ID: 1234567'.")
+            await message.answer("❌ Не могу найти ID. Ответьте на сообщение, где есть ID клиента.")
             return
 
     # Отправляем ответ
@@ -423,23 +422,6 @@ async def reply_to_user(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка отправки: {e}")
 
-# ПЕРЕСЫЛКА: КЛИЕНТ -> АДМИН
-# Этот блок ловит любые сообщения от клиентов (кроме команд) и пересылает их тебе
-@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444)
-async def forward_to_admin(message: types.Message):
-    # Уведомляем клиента, что его сообщение ушло
-    await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
-    
-    # Пересылаем сообщение админу
-    await bot.send_message(
-        6807542444,
-        f"📩 <b>Сообщение от клиента!</b>\n"
-        f"Имя: {message.from_user.full_name}\n"
-        f"ID: <code>{message.from_user.id}</code>",
-        parse_mode="HTML"
-    )
-    # Используем метод forward, чтобы ты видел оригинальное сообщение клиента
-    await message.forward(chat_id=6807542444)
 
 
 
