@@ -384,44 +384,30 @@ async def quiz_final(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("✅ Данные получены! Куратор клиники свяжется с вами.", reply_markup=main_kb())
 
-# 1. КЛИЕНТ -> АДМИН
-@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444, F.text, ~F.text.startswith('/'), ~F.reply_to_message)
-async def forward_to_admin(message: types.Message):
+ # --- ПЕРЕПИСКА (ФИНАЛЬНАЯ ВЕРСИЯ) ---
+
+# Ловим сообщения ТОЛЬКО если клиент НЕ в квизе (состояние None)
+@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444, ~F.reply_to_message)
+async def forward_to_admin(message: types.Message, state: FSMContext):
+    # Проверяем, не проходит ли он сейчас квиз
+    current_state = await state.get_state()
+    if current_state is not None:
+        return # Если в квизе, игнорируем, чтобы не ломать логику
+
+    # Если не в квизе — пересылаем
     await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
-    
-    # Отправляем тебе данные, кто написал
-    await bot.send_message(
-        6807542444,
-        f"📩 <b>Сообщение от клиента!</b>\n"
-        f"Имя: {message.from_user.full_name}\n"
-        f"ID: <code>{message.from_user.id}</code>",
-        parse_mode="HTML"
-    )
-    # Пересылаем само сообщение (чтобы видеть оригинал)
+    await bot.send_message(6807542444, f"📩 <b>Сообщение от клиента {message.from_user.full_name}</b> (ID: {message.from_user.id}):\n\n{message.text}", parse_mode="HTML")
     await message.forward(chat_id=6807542444)
 
-# 2. АДМИН -> КЛИЕНТ (ответ через Reply)
+# Ответ админа
 @dp.message(F.from_user.id == 6807542444, F.reply_to_message)
 async def reply_to_user(message: types.Message):
-    # Пытаемся найти ID
-    if message.reply_to_message.forward_from:
-        user_id = message.reply_to_message.forward_from.id
-    else:
-        try:
-            # Ищем ID в тексте сообщения, на которое отвечаем
-            text = message.reply_to_message.text
-            user_id = int(text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
-        except:
-            await message.answer("❌ Не могу найти ID. Ответьте на сообщение, где есть ID клиента.")
-            return
-
-    # Отправляем ответ
     try:
+        user_id = message.reply_to_message.forward_from.id
         await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
         await message.answer("✅ Ответ отправлен.")
-    except Exception as e:
-        await message.answer(f"❌ Ошибка отправки: {e}")
-
+    except:
+        await message.answer("❌ Ошибка: не могу найти ID клиента.")
 
 
 
