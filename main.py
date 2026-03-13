@@ -423,6 +423,24 @@ async def reply_to_user(message: types.Message):
     except Exception as e:
         await message.answer(f"❌ Ошибка отправки: {e}")
 
+# ПЕРЕСЫЛКА: КЛИЕНТ -> АДМИН
+# Этот блок ловит любые сообщения от клиентов (кроме команд) и пересылает их тебе
+@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444)
+async def forward_to_admin(message: types.Message):
+    # Уведомляем клиента, что его сообщение ушло
+    await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
+    
+    # Пересылаем сообщение админу
+    await bot.send_message(
+        6807542444,
+        f"📩 <b>Сообщение от клиента!</b>\n"
+        f"Имя: {message.from_user.full_name}\n"
+        f"ID: <code>{message.from_user.id}</code>",
+        parse_mode="HTML"
+    )
+    # Используем метод forward, чтобы ты видел оригинальное сообщение клиента
+    await message.forward(chat_id=6807542444)
+
 
 
 # --- ЗАПУСК ---
