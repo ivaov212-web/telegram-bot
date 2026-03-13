@@ -1,10 +1,12 @@
 import asyncio
+import csv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest  # <--- ЭТО ОБЯЗАТЕЛЬНО ДОБАВИТЬ
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 
 
 # --- КОНФИГУРАЦИЯ ---
@@ -14,6 +16,17 @@ ADMIN_ID = 6807542444  # Твой ID для получения заявок
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
+
+def save_to_csv(user_id, name, phone):
+    file_path = 'users.csv'
+    file_exists = os.path.isfile(file_path)
+    
+    with open(file_path, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['User ID', 'Имя', 'Телефон'])
+        writer.writerow([user_id, name, phone])
+
 
 # --- СОСТОЯНИЯ КВИЗА (9 ШАГОВ) ---
 class Quiz(StatesGroup):
@@ -77,14 +90,50 @@ def price_kb():
 # --- ОБРАБОТЧИКИ ---
 
 @dp.message(Command("start"))
-async def start(message: types.Message):
-    await message.answer(
-        "<b>ELEMENTS DENTAL CENTER</b> ⚪\n\n"
-        "Цифровая стоматология экспертного уровня. Мы объединили опыт "
-        "ведущих хирургов и технологии Carl Zeiss для вашего здоровья.\n\n"
-        "Выберите раздел:",
-        reply_markup=main_kb(), parse_mode="HTML"
+async def start_handler(message: types.Message):
+    # Создаем кнопку запроса контакта
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📱 Пройти верификацию", request_contact=True)]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True
     )
+    
+    await message.answer(
+        "<b>Добро пожаловать в Elements Dental Center! ✨</b>\n\n"
+        "Для доступа к прайс-листу и записи, пожалуйста, подтвердите ваш номер телефона, нажав кнопку ниже.",
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
+
+@dp.message(F.contact)
+async def get_contact(message: types.Message):
+    contact = message.contact
+    
+    # 1. Сохраняем в таблицу
+    save_to_csv(contact.user_id, contact.first_name, contact.phone_number)
+    
+    # 2. Уведомляем тебя (админа)
+    await bot.send_message(
+        6807542444, 
+        f"👤 <b>Новый клиент в базе!</b>\nИмя: {contact.first_name}\nТел: {contact.phone_number}\nID: <code>{contact.user_id}</code>",
+        parse_mode="HTML"
+    )
+    
+    # 3. Убираем кнопку верификации и показываем меню
+    await message.answer(
+        "Верификация пройдена! ✅ Теперь вам доступны все разделы.",
+        reply_markup=ReplyKeyboardRemove() 
+    )
+    await message.answer(
+        "<b>Выберите раздел:</b>",
+        reply_markup=main_kb(), # Твоя функция главного меню
+        parse_mode="HTML"
+    )
+
+
+
 
 @dp.callback_query(F.data == "to_main")
 async def back_main(callback: types.CallbackQuery, state: FSMContext):
@@ -334,6 +383,36 @@ async def quiz_final(message: types.Message, state: FSMContext):
 
     await state.clear()
     await message.answer("✅ Данные получены! Куратор клиники свяжется с вами.", reply_markup=main_kb())
+
+# КЛИЕНТ -> АДМИН (Пересылка сообщений тебе)
+@dp.message(F.chat.type == "private", ~F.from_user.id == 6807542444)
+async def forward_to_admin(message: types.Message):
+    await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
+    
+    # Пересылаем сообщение админу с данными клиента
+    await bot.send_message(
+        6807542444,
+        f"📩 <b>Сообщение от клиента!</b>\n"
+        f"Имя: {message.from_user.full_name}\n"
+        f"ID: <code>{message.from_user.id}</code>",
+        parse_mode="HTML"
+    )
+    await message.forward(chat_id=6807542444)
+
+# АДМИН -> КЛИЕНТ (Ответ на сообщение через Reply)
+@dp.message(F.from_user.id == 6807542444, F.reply_to_message)
+async def reply_to_user(message: types.Message):
+    # Пытаемся достать ID из пересланного сообщения
+    if message.reply_to_message.forward_from:
+        user_id = message.reply_to_message.forward_from.id
+        try:
+            await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
+            await message.answer("✅ Ответ отправлен.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка: {e}")
+    else:
+        await message.answer("❌ Не могу определить ID. Отвечайте только на пересланные ботом сообщения!")
+
 
 # --- ЗАПУСК ---
 async def main():
