@@ -402,16 +402,27 @@ async def forward_to_admin(message: types.Message):
 # АДМИН -> КЛИЕНТ (Ответ на сообщение через Reply)
 @dp.message(F.from_user.id == 6807542444, F.reply_to_message)
 async def reply_to_user(message: types.Message):
-    # Пытаемся достать ID из пересланного сообщения
+    # 1. Если сообщение переслано официально
     if message.reply_to_message.forward_from:
         user_id = message.reply_to_message.forward_from.id
-        try:
-            await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
-            await message.answer("✅ Ответ отправлен.")
-        except Exception as e:
-            await message.answer(f"❌ Ошибка: {e}")
+    
+    # 2. Если пересылки нет, пытаемся вытащить ID из текста (например, там написано "ID: 1234567")
     else:
-        await message.answer("❌ Не могу определить ID. Отвечайте только на пересланные ботом сообщения!")
+        try:
+            # Ищем ID в тексте сообщения, на которое отвечаем
+            text = message.reply_to_message.text
+            user_id = int(text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
+        except:
+            await message.answer("❌ Не могу найти ID. Ответьте на сообщение, где есть текст 'ID: 1234567'.")
+            return
+
+    # Отправляем ответ
+    try:
+        await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
+        await message.answer("✅ Ответ отправлен.")
+    except Exception as e:
+        await message.answer(f"❌ Ошибка отправки: {e}")
+
 
 
 # --- ЗАПУСК ---
