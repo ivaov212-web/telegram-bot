@@ -27,18 +27,29 @@ def save_to_csv(user_id, name, phone):
             writer.writerow(['User ID', 'Имя', 'Телефон'])
         writer.writerow([user_id, name, phone])
 
+def is_user_registered(user_id):
+    file_path = 'users.csv'
+    if not os.path.exists(file_path):
+        return False
+    try:
+        with open(file_path, mode='r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            # Проверяем каждую строку, есть ли там ID (он в первом столбце)
+            for row in reader:
+                if row and str(row[0]) == str(user_id):
+                    return True
+    except:
+        return False
+    return False
 
-# --- СОСТОЯНИЯ КВИЗА (9 ШАГОВ) ---
-class Quiz(StatesGroup):
-    goal = State()
-    symptoms = State()
-    gnathology = State()
-    aesthetic = State()
-    diagnostics = State()
-    history = State()
-    priority = State()
-    budget = State()
-    contact = State()
+
+
+class EasyQuiz(StatesGroup):
+    goal = State()      # Чего хочет клиент
+    last_visit = State() # Как давно был у врача
+    comfort = State()    # Насколько боится
+    contact = State()    # Номер телефона
+
 
 # --- ИНФОРМАЦИОННЫЕ БЛОКИ ---
 
@@ -90,22 +101,30 @@ def price_kb():
 # --- ОБРАБОТЧИКИ ---
 
 @dp.message(Command("start"))
-async def start_handler(message: types.Message):
-    # Создаем кнопку запроса контакта
-    kb = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="📱 Пройти верификацию", request_contact=True)]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
+async def start_handler(message: types.Message, state: FSMContext):
+    await state.clear() # Сбрасываем квиз, если человек решил начать заново
     
-    await message.answer(
-        "<b>Добро пожаловать в Elements Dental Center! ✨</b>\n\n"
-        "Для доступа к прайс-листу и записи, пожалуйста, подтвердите ваш номер телефона, нажав кнопку ниже.",
-        reply_markup=kb,
-        parse_mode="HTML"
-    )
+    if is_user_registered(message.from_user.id):
+        # Если клиент уже знаком, просто даем меню
+        await message.answer(
+            f"<b>С возвращением, {message.from_user.first_name}! ✨</b>\nЧем можем помочь сегодня?",
+            reply_markup=main_kb(),
+            parse_mode="HTML"
+        )
+    else:
+        # Если новый — просим номер
+        kb = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text="📱 Пройти верификацию", request_contact=True)]],
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
+        await message.answer(
+            "<b>Добро пожаловать в Elements! ✨</b>\n\n"
+            "Для доступа к прайсу и записи, пожалуйста, подтвердите ваш номер телефона.",
+            reply_markup=kb,
+            parse_mode="HTML"
+        )
+
 
 @dp.message(F.contact)
 async def get_contact(message: types.Message):
@@ -289,100 +308,100 @@ async def price_detail(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# --- КВИЗ (9 ШАГОВ) ---
+# --- УПРОЩЕННЫЙ КВИЗ ---
 
 @dp.callback_query(F.data == "quiz_start")
-async def quiz_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Quiz.goal)
+async def easy_quiz_1(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(EasyQuiz.goal)
     kb = InlineKeyboardBuilder()
-    kb.button(text="🦷 Лечение боли", callback_data="g:Лечение")
-    kb.button(text="✨ Виниры/Эстетика", callback_data="g:Эстетика")
-    kb.button(text="🦾 Имплантация", callback_data="g:Имплантация")
-    kb.button(text="📐 Прикус", callback_data="g:Прикус")
+    kb.button(text="🦷 Вылечить зубы", callback_data="eq:Лечение")
+    kb.button(text="✨ Сделать улыбку красивее", callback_data="eq:Эстетика")
+    kb.button(text="🦷 Восстановить зубы", callback_data="eq:Восстановление")
     kb.adjust(1)
-    await callback.message.edit_text("<b>Шаг 1/9:</b> Какая задача сейчас самая важная?", reply_markup=kb.as_markup(), parse_mode="HTML")
-
-@dp.callback_query(Quiz.goal)
-async def quiz_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(goal=callback.data.split(":")[1])
-    await state.set_state(Quiz.symptoms)
-    kb = InlineKeyboardBuilder().button(text="Да", callback_data="s:Да").button(text="Нет", callback_data="s:Нет")
-    await callback.message.edit_text("<b>Шаг 2/9:</b> Беспокоят ли вас боли в зубах или деснах?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.symptoms)
-async def quiz_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(pain=callback.data.split(":")[1])
-    await state.set_state(Quiz.gnathology)
-    kb = InlineKeyboardBuilder()
-    kb.button(text="Щелчки в челюсти", callback_data="gn:Щелчки")
-    kb.button(text="Головные боли", callback_data="gn:Боли")
-    kb.button(text="Все в норме", callback_data="gn:Норма")
-    kb.adjust(1)
-    await callback.message.edit_text("<b>Шаг 3/9:</b> Замечали ли вы щелчки при открывании рта или скрежет зубами?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.gnathology)
-async def quiz_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(gnath=callback.data.split(":")[1])
-    await state.set_state(Quiz.aesthetic)
-    kb = InlineKeyboardBuilder().button(text="Цвет", callback_data="a:Цвет").button(text="Форма зубов", callback_data="a:Форма").button(text="Отсутствие зуба", callback_data="a:Пробел")
-    await callback.message.edit_text("<b>Шаг 4/9:</b> Что бы вы хотели изменить визуально?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.aesthetic)
-async def quiz_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(look=callback.data.split(":")[1])
-    await state.set_state(Quiz.diagnostics)
-    kb = InlineKeyboardBuilder().button(text="Есть КТ/Снимок", callback_data="d:Да").button(text="Нужна диагностика", callback_data="d:Нет")
-    await callback.message.edit_text("<b>Шаг 5/9:</b> Делали ли вы КЛКТ (3D снимок) в последние полгода?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.diagnostics)
-async def quiz_6(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(diag=callback.data.split(":")[1])
-    await state.set_state(Quiz.history)
-    kb = InlineKeyboardBuilder().button(text="До 6 месяцев", callback_data="h:Полгода").button(text="Давно", callback_data="h:Давно")
-    await callback.message.edit_text("<b>Шаг 6/9:</b> Как давно вы были на профессиональной гигиене?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.history)
-async def quiz_7(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(hist=callback.data.split(":")[1])
-    await state.set_state(Quiz.priority)
-    kb = InlineKeyboardBuilder().button(text="Максимальная эстетика", callback_data="p:Эстетика").button(text="Функциональность", callback_data="p:Функция")
-    await callback.message.edit_text("<b>Шаг 7/9:</b> Что для вас важнее в результате лечения?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.priority)
-async def quiz_8(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(prio=callback.data.split(":")[1])
-    await state.set_state(Quiz.budget)
-    kb = InlineKeyboardBuilder().button(text="Премиум (E-max)", callback_data="b:Премиум").button(text="Стандарт", callback_data="b:Стандарт")
-    await callback.message.edit_text("<b>Шаг 8/9:</b> Какие материалы рассматриваете?", reply_markup=kb.as_markup())
-
-@dp.callback_query(Quiz.budget)
-async def quiz_9(callback: types.CallbackQuery, state: FSMContext):
-    await state.update_data(bud=callback.data.split(":")[1])
-    await state.set_state(Quiz.contact)
-    await callback.message.edit_text("<b>Шаг 9/9:</b> Введите ваш номер телефона, и мы свяжемся для записи:")
-
-@dp.message(Quiz.contact)
-async def quiz_final(message: types.Message, state: FSMContext):
-    phone = message.text
-    data = await state.get_data()
+    kb.row(types.InlineKeyboardButton(text="🏠 В главное меню", callback_data="to_main"))
     
+    await callback.message.edit_text(
+        "<b>Шаг 1/4:</b> Какая задача для вас сейчас наиболее важна?",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.goal)
+async def easy_quiz_2(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(goal=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.last_visit)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Менее 6 месяцев назад", callback_data="ev:Недавно")
+    kb.button(text="Более года назад", callback_data="ev:Давно")
+    kb.button(text="Очень давно", callback_data="ev:Затрудняюсь")
+    kb.adjust(1)
+    kb.row(types.InlineKeyboardButton(text="⬅️ Назад", callback_data="quiz_start"))
+    
+    await callback.message.edit_text(
+        "<b>Шаг 2/4:</b> Как давно вы были на профилактическом осмотре?",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.last_visit)
+async def easy_quiz_3(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(last_visit=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.comfort)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Спокойно, доверяю врачам", callback_data="ec:Спокойно")
+    kb.button(text="Немного волнуюсь", callback_data="ec:Волнуюсь")
+    kb.button(text="Очень боюсь", callback_data="ec:Боюсь")
+    kb.adjust(1)
+    kb.row(types.InlineKeyboardButton(text="⬅️ Назад", callback_data="quiz_start")) # Можно усложнить и вернуть на шаг 2, но для легкости ведем в начало
+    
+    await callback.message.edit_text(
+        "<b>Шаг 3/4:</b> Как вы относитесь к посещению стоматолога?\n<i>(Мы подберем максимально комфортный подход)</i>",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.comfort)
+async def easy_quiz_4(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(comfort=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.contact)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 В меню", callback_data="to_main")
+    
+    await callback.message.edit_text(
+        "<b>Шаг 4/4:</b> Почти готово! Оставьте ваш номер телефона, и наш куратор подберет удобное время для консультации.",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.message(EasyQuiz.contact)
+async def easy_quiz_final(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    phone = message.text
+    
+    # Формируем отчет для админа
     report = (
-        f"<b>🚨 НОВАЯ ЗАЯВКА - ELEMENTS</b>\n"
-        f"👤 Пациент: {message.from_user.full_name}\n"
+        f"<b>💎 НОВАЯ КОНСУЛЬТАЦИЯ</b>\n"
+        f"👤 Клиент: {message.from_user.full_name}\n"
         f"📞 Тел: {phone}\n"
-        f"📋 Цель: {data['goal']}\n"
-        f"🦷 Боль: {data['pain']}\n"
-        f"🧠 Гнато: {data['gnath']}\n"
-        f"🔍 Снимок: {data['diag']}"
+        f"🎯 Цель: {data.get('goal')}\n"
+        f"📅 Последний визит: {data.get('last_visit')}\n"
+        f"🧘 Состояние: {data.get('comfort')}\n"
+        f"ID: <code>{message.from_user.id}</code>"
     )
     
-    try:
-        await bot.send_message(ADMIN_ID, report, parse_mode="HTML")
-    except:
-        pass
-
+    await bot.send_message(ADMIN_ID, report, parse_mode="HTML")
     await state.clear()
-    await message.answer("✅ Данные получены! Куратор клиники свяжется с вами.", reply_markup=main_kb())
+    
+    await message.answer(
+        "✅ <b>Спасибо за доверие!</b>\n\nМы получили ваши данные. Куратор клиники Elements свяжется с вами в ближайшее время, чтобы ответить на вопросы.",
+        reply_markup=main_kb(),
+        parse_mode="HTML"
+    )
+
+
 
 # --- ЕДИНЫЙ ОБРАБОТЧИК (КЛИЕНТ <-> АДМИН) ---
 
@@ -404,12 +423,17 @@ async def admin_chat_bridge(message: types.Message, state: FSMContext):
         return # Важно: прерываем выполнение, чтобы не идти дальше
 
     # 2. ПЕРЕСЫЛКА КЛИЕНТА АДМИНУ
-    # Мы пересылаем, ТОЛЬКО если клиент НЕ в квизе (state is None)
     current_state = await state.get_state()
     if message.from_user.id != 6807542444 and current_state is None and not message.text.startswith('/'):
-        await message.answer("Ваше сообщение отправлено администратору. Ожидайте ответа! ✨")
+        # Создаем кнопку, чтобы клиент мог вернуться в меню
+        kb = InlineKeyboardBuilder()
+        kb.button(text="🏠 Вернуться в главное меню", callback_data="to_main")
+        
+        await message.answer(
+            "Ваше сообщение отправлено администратору. Ожидайте ответа! ✨", 
+            reply_markup=kb.as_markup()
+        )
         await message.forward(chat_id=6807542444)
-
 
 
 
