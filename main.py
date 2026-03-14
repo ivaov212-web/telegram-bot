@@ -176,7 +176,7 @@ async def show_price(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "menu_contacts")
 async def show_contacts(callback: types.CallbackQuery):
     kb = InlineKeyboardBuilder()
-    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start") # Выделили квиз как главный способ записи
+    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
     kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
     kb.button(text="📞 Позвонить сейчас", url="tel:+79493071585")
     kb.button(text="⬅️ Назад", callback_data="to_main")
@@ -193,11 +193,15 @@ async def show_contacts(callback: types.CallbackQuery):
         "<i>Мы всегда на связи и готовы помочь подобрать удобное время!</i>"
     )
     
+    # Сначала отвечаем на callback, чтобы убрать "часики" загрузки
+    await callback.answer()
+    
     try:
         await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
     except TelegramBadRequest:
+        # Если текст такой же, Telegram может выдать ошибку, просто игнорируем
         pass
-    await callback.answer()
+
 
 
 
