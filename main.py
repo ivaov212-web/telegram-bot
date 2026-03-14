@@ -97,6 +97,33 @@ def price_kb():
     return kb.as_markup()
 
 
+@dp.callback_query(F.data == "menu_contacts")
+async def show_contacts(callback: types.CallbackQuery):
+    # Принудительно очищаем чат от старых сообщений или просто обновляем
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
+    kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
+    kb.button(text="📞 Позвонить сейчас", url="tel:+79493071585")
+    kb.button(text="⬅️ Назад", callback_data="to_main")
+    kb.adjust(1)
+    
+    text = (
+        "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
+        "г. Донецк, пр-т Ильича, 17в\n"
+        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n\n"
+        "📞 <b>Телефон:</b> <a href='tel:+79493071585'>+7 (949) 307-15-85</a>\n\n"
+        "<b>Как записаться к нам на приём?</b>\n"
+        "• <b>Быстро:</b> Нажмите кнопку «Записаться через квиз» ниже.\n"
+        "• <b>Лично:</b> Позвоните нам или напишите администратору."
+    )
+    
+    await callback.answer() # Обязательно ответили
+    try:
+        await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+    except Exception as e:
+        print(f"Ошибка в контактах: {e}") # Выведет ошибку в консоль, если она есть
+
+
 
 # --- ОБРАБОТЧИКИ ---
 
@@ -173,34 +200,7 @@ async def show_tech(callback: types.CallbackQuery):
 async def show_price(callback: types.CallbackQuery):
     await callback.message.edit_text("<b>💰 КАТЕГОРИИ УСЛУГ</b>", reply_markup=price_kb(), parse_mode="HTML")
 
-@dp.callback_query(F.data == "menu_contacts")
-async def show_contacts(callback: types.CallbackQuery):
-    kb = InlineKeyboardBuilder()
-    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
-    kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
-    kb.button(text="📞 Позвонить сейчас", url="tel:+79493071585")
-    kb.button(text="⬅️ Назад", callback_data="to_main")
-    kb.adjust(1)
-    
-    text = (
-        "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
-        "г. Донецк, пр-т Ильича, 17в\n"
-        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n\n"
-        "📞 <b>Телефон:</b> <a href='tel:+79493071585'>+7 (949) 307-15-85</a>\n\n"
-        "<b>Как записаться к нам на приём?</b>\n"
-        "• <b>Быстро:</b> Нажмите кнопку «Записаться через квиз» ниже.\n"
-        "• <b>Лично:</b> Позвоните нам или напишите администратору.\n\n"
-        "<i>Мы всегда на связи и готовы помочь подобрать удобное время!</i>"
-    )
-    
-    # Сначала отвечаем на callback, чтобы убрать "часики" загрузки
-    await callback.answer()
-    
-    try:
-        await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
-    except TelegramBadRequest:
-        # Если текст такой же, Telegram может выдать ошибку, просто игнорируем
-        pass
+
 
 
 
