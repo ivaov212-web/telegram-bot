@@ -405,35 +405,35 @@ async def easy_quiz_final(message: types.Message, state: FSMContext):
 
 # --- ЕДИНЫЙ ОБРАБОТЧИК (КЛИЕНТ <-> АДМИН) ---
 
-@dp.message(F.chat.type == "private")
-async def admin_chat_bridge(message: types.Message, state: FSMContext):
-    # 1. ОТВЕТ АДМИНА КЛИЕНТУ (через Reply)
-    if message.from_user.id == 6807542444 and message.reply_to_message:
-        try:
-            # Пытаемся достать ID клиента из сообщения, на которое отвечаем
-            if message.reply_to_message.forward_from:
-                user_id = message.reply_to_message.forward_from.id
-            else:
-                user_id = int(message.reply_to_message.text.split("ID: ")[1].split()[0].replace("<code>", "").replace("</code>", ""))
-            
-            await bot.send_message(user_id, f"<b>Ответ администратора:</b>\n\n{message.text}", parse_mode="HTML")
-            await message.answer("✅ Ответ отправлен!")
-        except Exception as e:
-            await message.answer(f"❌ Ошибка отправки: {e}")
-        return # Важно: прерываем выполнение, чтобы не идти дальше
+@dp.message()
+async def handle_messages(message: types.Message, state: FSMContext):
+    # 1. Если пишет АДМИН (ответ клиенту)
+    if message.from_user.id == ADMIN_ID:
+        if message.reply_to_message and message.reply_to_message.forward_from:
+            user_id = message.reply_to_message.forward_from.id
+            try:
+                await bot.send_message(user_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
+                await message.answer("✅ Ответ отправлен клиенту.")
+            except Exception:
+                await message.answer("❌ Не удалось отправить ответ (возможно, клиент заблокировал бота).")
+        return # Выходим, чтобы код ниже не выполнялся для админа
 
-    # 2. ПЕРЕСЫЛКА КЛИЕНТА АДМИНУ
+    # 2. Если пишет КЛИЕНТ (пересылка админу)
+    # Проверяем, что это не команда и что пользователь не находится в процессе квиза
     current_state = await state.get_state()
-    if message.from_user.id != 6807542444 and current_state is None and not message.text.startswith('/'):
-        # Создаем кнопку, чтобы клиент мог вернуться в меню
+    if current_state is None and not message.text.startswith('/'):
+        # Создаем кнопку, чтобы клиент мог вернуться в меню, если запутается
         kb = InlineKeyboardBuilder()
-        kb.button(text="🏠 Вернуться в главное меню", callback_data="to_main")
+        kb.button(text="🏠 В главное меню", callback_data="to_main")
         
+        # Пересылаем сообщение админу
+        await message.forward(chat_id=ADMIN_ID)
+        
+        # Подтверждаем клиенту, что сообщение ушло
         await message.answer(
-            "Ваше сообщение отправлено администратору. Ожидайте ответа! ✨", 
+            "Ваше сообщение отправлено администратору Elements. Ожидайте ответа! ✨", 
             reply_markup=kb.as_markup()
         )
-        await message.forward(chat_id=6807542444)
 
 
 
