@@ -412,52 +412,44 @@ async def easy_quiz_final(message: types.Message, state: FSMContext):
 
 @dp.message()
 async def handle_messages(message: types.Message, state: FSMContext):
-    # 1. Если пишет АДМИН (ответ клиенту)
-    if message.from_user.id == ADMIN_ID:
-        if message.reply_to_message:
-            target_id = None
-            if message.reply_to_message.forward_from:
-                target_id = message.reply_to_message.forward_from.id
-            elif "ID:" in message.reply_to_message.text:
-                try:
-                    target_id = int(message.reply_to_message.text.split("ID:")[1].strip().split()[0])
-                except:
-                    pass
-
-            if target_id:
-                try:
-                    # Теперь админ может слать фото, видео, документы или текст
-                    if message.photo:
-                        await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption)
-                    elif message.video:
-                        await bot.send_video(target_id, message.video.file_id, caption=message.caption)
-                    elif message.document:
-                        await bot.send_document(target_id, message.document.file_id, caption=message.caption)
-                    else:
-                        await bot.send_message(target_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
-                    
-                    await message.answer("✅ Отправлено!")
-                except Exception as e:
-                    await message.answer(f"❌ Ошибка: {e}")
-            else:
-                await message.answer("⚠️ Не могу определить получателя.")
-        return
-
-    # 2. Если пишет КЛИЕНТ (пересылка админу)
-    current_state = await state.get_state()
-    if current_state is None and not message.text and not message.text.startswith('/'): # (добавили проверку на текст)
-        pass # пусть идет дальше к пересылке
-
-    if current_state is None:
-        user_info = f"📩 <b>Новое сообщение от:</b> {message.from_user.full_name}\nID: <code>{message.from_user.id}</code>"
-        await bot.send_message(ADMIN_ID, user_info, parse_mode="HTML")
-        await message.forward(chat_id=ADMIN_ID)
+    # 1. ОТВЕТ АДМИНА КЛИЕНТУ
+    if message.from_user.id == ADMIN_ID and message.reply_to_message:
+        target_id = None
         
-        # Если это текст, даем кнопку меню
-        if message.text:
+        # Пытаемся получить ID клиента из пересланного сообщения или текста
+        if message.reply_to_message.forward_from:
+            target_id = message.reply_to_message.forward_from.id
+        elif message.reply_to_message.caption and "ID:" in message.reply_to_message.caption:
+            target_id = int(message.reply_to_message.caption.split("ID:")[1].strip().split()[0])
+        elif message.reply_to_message.text and "ID:" in message.reply_to_message.text:
+            target_id = int(message.reply_to_message.text.split("ID:")[1].strip().split()[0])
+
+        if target_id:
+            try:
+                await bot.copy_message(chat_id=target_id, from_chat_id=message.chat.id, message_id=message.message_id)
+                await message.answer("✅ Отправлено клиенту!")
+            except Exception as e:
+                await message.answer(f"❌ Ошибка отправки: {e}")
+        else:
+            await message.answer("⚠️ Не могу найти ID клиента. Отвечайте на сообщение, где есть пометка 'ID:'")
+        return 
+
+    # 2. ПЕРЕСЫЛКА КЛИЕНТА АДМИНУ
+    current_state = await state.get_state()
+    if current_state is None and message.from_user.id != ADMIN_ID:
+        # Уведомление админу
+        user_info = f"📩 <b>Новое сообщение</b>\nОт: {message.from_user.full_name}\nID: <code>{message.from_user.id}</code>"
+        await bot.send_message(ADMIN_ID, user_info, parse_mode="HTML")
+        
+        # Пересылка контента (текст, фото, видео)
+        await bot.copy_message(chat_id=ADMIN_ID, from_chat_id=message.chat.id, message_id=message.message_id)
+        
+        # Если это текст, добавляем кнопку возврата
+        if message.text and not message.text.startswith('/'):
             kb = InlineKeyboardBuilder()
             kb.button(text="🏠 В главное меню", callback_data="to_main")
-            await message.answer("Сообщение доставлено!", reply_markup=kb.as_markup())
+            await message.answer("Сообщение доставлено администратору Elements!", reply_markup=kb.as_markup())
+
 
 
 
