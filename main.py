@@ -176,16 +176,21 @@ async def show_price(callback: types.CallbackQuery):
 @dp.callback_query(F.data == "menu_contacts")
 async def show_contacts(callback: types.CallbackQuery):
     kb = InlineKeyboardBuilder()
+    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start") # Выделили квиз как главный способ записи
     kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
+    kb.button(text="📞 Позвонить сейчас", url="tel:+79493071585")
     kb.button(text="⬅️ Назад", callback_data="to_main")
     kb.adjust(1)
     
     text = (
         "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
         "г. Донецк, пр-т Ильича, 17в\n"
-        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n"
-        "📞 <b>Телефон:</b> +7 (949) 307-15-85\n\n"
-        "Вы можете записаться через квиз или написать нам напрямую."
+        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n\n"
+        "📞 <b>Телефон:</b> <a href='tel:+79493071585'>+7 (949) 307-15-85</a>\n\n"
+        "<b>Как записаться к нам на приём?</b>\n"
+        "• <b>Быстро:</b> Нажмите кнопку «Записаться через квиз» ниже.\n"
+        "• <b>Лично:</b> Позвоните нам или напишите администратору.\n\n"
+        "<i>Мы всегда на связи и готовы помочь подобрать удобное время!</i>"
     )
     
     try:
@@ -193,6 +198,7 @@ async def show_contacts(callback: types.CallbackQuery):
     except TelegramBadRequest:
         pass
     await callback.answer()
+
 
 
 @dp.callback_query(F.data.startswith("pr:"))
@@ -402,7 +408,6 @@ async def easy_quiz_final(message: types.Message, state: FSMContext):
     )
 
 
-
 # --- ЕДИНЫЙ ОБРАБОТЧИК (КЛИЕНТ <-> АДМИН) ---
 
 @dp.message()
@@ -411,47 +416,48 @@ async def handle_messages(message: types.Message, state: FSMContext):
     if message.from_user.id == ADMIN_ID:
         if message.reply_to_message:
             target_id = None
-            
-            # Вариант А: Пытаемся взять ID из пересланного сообщения (если открыт профиль)
             if message.reply_to_message.forward_from:
                 target_id = message.reply_to_message.forward_from.id
-            
-            # Вариант Б: Ищем ID в тексте сообщения, на которое отвечаем (наш "маяк")
             elif "ID:" in message.reply_to_message.text:
                 try:
-                    # Вытаскиваем цифры после "ID:"
                     target_id = int(message.reply_to_message.text.split("ID:")[1].strip().split()[0])
                 except:
                     pass
 
             if target_id:
                 try:
-                    await bot.send_message(target_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
-                    await message.answer("✅ Ответ отправлен!")
-                except Exception:
-                    await message.answer("❌ Ошибка отправки. Возможно, клиент заблокировал бота.")
+                    # Теперь админ может слать фото, видео, документы или текст
+                    if message.photo:
+                        await bot.send_photo(target_id, message.photo[-1].file_id, caption=message.caption)
+                    elif message.video:
+                        await bot.send_video(target_id, message.video.file_id, caption=message.caption)
+                    elif message.document:
+                        await bot.send_document(target_id, message.document.file_id, caption=message.caption)
+                    else:
+                        await bot.send_message(target_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
+                    
+                    await message.answer("✅ Отправлено!")
+                except Exception as e:
+                    await message.answer(f"❌ Ошибка: {e}")
             else:
-                await message.answer("⚠️ Не могу определить получателя. Отвечайте на сообщение с пометкой ID.")
+                await message.answer("⚠️ Не могу определить получателя.")
         return
 
     # 2. Если пишет КЛИЕНТ (пересылка админу)
     current_state = await state.get_state()
-    if current_state is None and not message.text.startswith('/'):
-        # Сообщаем админу КТО пишет (это сработает даже если профиль скрыт)
-        user_info = f"📩 <b>Новое сообщение</b>\nОт: {message.from_user.full_name}\nID: {message.from_user.id}"
+    if current_state is None and not message.text and not message.text.startswith('/'): # (добавили проверку на текст)
+        pass # пусть идет дальше к пересылке
+
+    if current_state is None:
+        user_info = f"📩 <b>Новое сообщение от:</b> {message.from_user.full_name}\nID: <code>{message.from_user.id}</code>"
         await bot.send_message(ADMIN_ID, user_info, parse_mode="HTML")
-        
-        # Пересылаем само сообщение (текст, фото и т.д.)
         await message.forward(chat_id=ADMIN_ID)
         
-        # Кнопка для клиента
-        kb = InlineKeyboardBuilder()
-        kb.button(text="🏠 В главное меню", callback_data="to_main")
-        
-        await message.answer(
-            "Ваше сообщение отправлено администратору Elements. Ожидайте ответа! ✨", 
-            reply_markup=kb.as_markup()
-        )
+        # Если это текст, даем кнопку меню
+        if message.text:
+            kb = InlineKeyboardBuilder()
+            kb.button(text="🏠 В главное меню", callback_data="to_main")
+            await message.answer("Сообщение доставлено!", reply_markup=kb.as_markup())
 
 
 
