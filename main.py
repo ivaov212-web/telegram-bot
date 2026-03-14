@@ -409,27 +409,45 @@ async def easy_quiz_final(message: types.Message, state: FSMContext):
 async def handle_messages(message: types.Message, state: FSMContext):
     # 1. Если пишет АДМИН (ответ клиенту)
     if message.from_user.id == ADMIN_ID:
-        if message.reply_to_message and message.reply_to_message.forward_from:
-            user_id = message.reply_to_message.forward_from.id
-            try:
-                await bot.send_message(user_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
-                await message.answer("✅ Ответ отправлен клиенту.")
-            except Exception:
-                await message.answer("❌ Не удалось отправить ответ (возможно, клиент заблокировал бота).")
-        return # Выходим, чтобы код ниже не выполнялся для админа
+        if message.reply_to_message:
+            target_id = None
+            
+            # Вариант А: Пытаемся взять ID из пересланного сообщения (если открыт профиль)
+            if message.reply_to_message.forward_from:
+                target_id = message.reply_to_message.forward_from.id
+            
+            # Вариант Б: Ищем ID в тексте сообщения, на которое отвечаем (наш "маяк")
+            elif "ID:" in message.reply_to_message.text:
+                try:
+                    # Вытаскиваем цифры после "ID:"
+                    target_id = int(message.reply_to_message.text.split("ID:")[1].strip().split()[0])
+                except:
+                    pass
+
+            if target_id:
+                try:
+                    await bot.send_message(target_id, f"<b>Ответ от администратора:</b>\n\n{message.text}", parse_mode="HTML")
+                    await message.answer("✅ Ответ отправлен!")
+                except Exception:
+                    await message.answer("❌ Ошибка отправки. Возможно, клиент заблокировал бота.")
+            else:
+                await message.answer("⚠️ Не могу определить получателя. Отвечайте на сообщение с пометкой ID.")
+        return
 
     # 2. Если пишет КЛИЕНТ (пересылка админу)
-    # Проверяем, что это не команда и что пользователь не находится в процессе квиза
     current_state = await state.get_state()
     if current_state is None and not message.text.startswith('/'):
-        # Создаем кнопку, чтобы клиент мог вернуться в меню, если запутается
+        # Сообщаем админу КТО пишет (это сработает даже если профиль скрыт)
+        user_info = f"📩 <b>Новое сообщение</b>\nОт: {message.from_user.full_name}\nID: {message.from_user.id}"
+        await bot.send_message(ADMIN_ID, user_info, parse_mode="HTML")
+        
+        # Пересылаем само сообщение (текст, фото и т.д.)
+        await message.forward(chat_id=ADMIN_ID)
+        
+        # Кнопка для клиента
         kb = InlineKeyboardBuilder()
         kb.button(text="🏠 В главное меню", callback_data="to_main")
         
-        # Пересылаем сообщение админу
-        await message.forward(chat_id=ADMIN_ID)
-        
-        # Подтверждаем клиенту, что сообщение ушло
         await message.answer(
             "Ваше сообщение отправлено администратору Elements. Ожидайте ответа! ✨", 
             reply_markup=kb.as_markup()
