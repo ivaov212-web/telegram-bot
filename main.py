@@ -75,15 +75,16 @@ TECH_DETAILED = (
 
 # --- КЛАВИАТУРЫ ---
 
-def main_kb(): # Обязательно с маленькой 'd'
+def main_kb():
     kb = InlineKeyboardBuilder()
     kb.button(text="📝 Подобрать план лечения (Квиз)", callback_data="quiz_start")
     kb.button(text="💰 Услуги и прайс", callback_data="menu_price")
     kb.button(text="👨‍⚕️ Наши специалисты", callback_data="menu_team")
     kb.button(text="🏥 Технологии и оборудование", callback_data="menu_tech")
-    kb.button(text="📍 Контакты", callback_data="show_contacts_now") # Обновили ID кнопки
+    kb.button(text="📍 Контакты", callback_data="menu_contacts") # Проверь эту строку!
     kb.adjust(1)
     return kb.as_markup()
+
 
 
 def price_kb():
@@ -98,13 +99,10 @@ def price_kb():
     return kb.as_markup()
 
 
-@dp.callback_query(F.data == "show_contacts_now")
+
+@dp.callback_query(F.data.startswith("menu_contacts")) # Изменили на startswith для надежности
 async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
-    # ВОТ ЭТОТ ПРИНТ:
-    print(">>> КНОПКА КОНТАКТЫ НАЖАТА! БОТ ПОЛУЧИЛ СИГНАЛ <<<")
-    
-    await callback.answer()
-    await state.clear()
+    await callback.answer() # Убирает состояние нажатия (часики)
     
     kb = InlineKeyboardBuilder()
     kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
@@ -126,33 +124,8 @@ async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
     try:
         await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
     except Exception as e:
-        print(f"Ошибка: {e}")
+        # Если не получается отредактировать, просто шлем новым сообщением
         await callback.message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
-
-# --- Исправленный универсальный обработчик ---
-
-@dp.message()
-async def handle_messages(message: types.Message, state: FSMContext):
-    # Принт для отладки любых входящих сообщений
-    print(f"DEBUG: Получено сообщение от {message.from_user.id}: {message.text}")
-    
-    # 1. ОТВЕТ АДМИНА КЛИЕНТУ
-    if message.from_user.id == ADMIN_ID and message.reply_to_message:
-        # ... (ваш код обработки ответа админа)
-        return 
-
-    # 2. ПЕРЕСЫЛКА КЛИЕНТА АДМИНУ
-    current_state = await state.get_state()
-    # Добавляем проверку, чтобы не перехватывать команды и системные сообщения
-    if current_state is None and message.from_user.id != ADMIN_ID and not message.text.startswith('/'):
-        print(f"DEBUG: Пересылка сообщения от {message.from_user.id} администратору.")
-        user_info = f"📩 <b>Новое сообщение</b>\nОт: {message.from_user.full_name}\nID: <code>{message.from_user.id}</code>"
-        await bot.send_message(ADMIN_ID, user_info, parse_mode="HTML")
-        await bot.copy_message(chat_id=ADMIN_ID, from_chat_id=message.chat.id, message_id=message.message_id)
-        
-        kb = InlineKeyboardBuilder()
-        kb.button(text="🏠 В главное меню", callback_data="to_main")
-        await message.answer("Сообщение доставлено администратору Elements!", reply_markup=kb.as_markup())
 
 
 
