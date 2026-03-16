@@ -100,16 +100,32 @@ def price_kb():
 
 
 
-@dp.callback_query(F.data == "show_contacts_now")
+@dp.callback_query(F.data.startswith("menu_contacts")) # Изменили на startswith для надежности
 async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
-    # Добавь этот принт, чтобы увидеть нажатие в логах!
-    print("!!! НАЖАТА КНОПКА КОНТАКТЫ !!!")
+    await callback.answer() # Убирает состояние нажатия (часики)
     
-    await callback.answer()
-    text = "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\nг. Донецк, пр-т Ильича, 17в..."
-    # ... остальной код клавиатуры контактов
-    await callback.message.answer(text, parse_mode="HTML") 
-
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
+    kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
+    kb.button(text="📞 Позвонить сейчас", url="tel:+79493071585")
+    kb.button(text="⬅️ Назад", callback_data="to_main")
+    kb.adjust(1)
+    
+    text = (
+        "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
+        "г. Донецк, пр-т Ильича, 17в\n"
+        "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n\n"
+        "📞 <b>Телефон:</b> <a href='tel:+79493071585'>+7 (949) 307-15-85</a>\n\n"
+        "<b>Как записаться к нам на приём?</b>\n"
+        "• <b>Быстро:</b> Нажмите кнопку «Записаться через квиз» ниже.\n"
+        "• <b>Лично:</b> Позвоните нам или напишите администратору."
+    )
+    
+    try:
+        await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+    except Exception as e:
+        # Если не получается отредактировать, просто шлем новым сообщением
+        await callback.message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
 
 
