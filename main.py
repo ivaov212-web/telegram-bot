@@ -43,7 +43,11 @@ def is_user_registered(user_id):
     return False
 
 
-
+class EasyQuiz(StatesGroup):
+    goal = State()      # Чего хочет клиент
+    last_visit = State() # Как давно был у врача
+    comfort = State()    # Насколько боится
+    contact = State()    # Номер телефона
 
 
 # --- ИНФОРМАЦИОННЫЕ БЛОКИ ---
@@ -322,7 +326,97 @@ async def price_detail(callback: types.CallbackQuery):
 
 # --- УПРОЩЕННЫЙ КВИЗ ---
 
+@dp.callback_query(F.data == "quiz_start")
+async def easy_quiz_1(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(EasyQuiz.goal)
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🦷 Вылечить зубы", callback_data="eq:Лечение")
+    kb.button(text="✨ Сделать улыбку красивее", callback_data="eq:Эстетика")
+    kb.button(text="🦷 Восстановить зубы", callback_data="eq:Восстановление")
+    kb.adjust(1)
+    kb.row(types.InlineKeyboardButton(text="🏠 В главное меню", callback_data="to_main"))
     
+    await callback.message.edit_text(
+        "<b>Шаг 1/4:</b> Какая задача для вас сейчас наиболее важна?",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.goal)
+async def easy_quiz_2(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(goal=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.last_visit)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Менее 6 месяцев назад", callback_data="ev:Недавно")
+    kb.button(text="Более года назад", callback_data="ev:Давно")
+    kb.button(text="Очень давно", callback_data="ev:Затрудняюсь")
+    kb.adjust(1)
+    kb.row(types.InlineKeyboardButton(text="⬅️ Назад", callback_data="quiz_start"))
+    
+    await callback.message.edit_text(
+        "<b>Шаг 2/4:</b> Как давно вы были на профилактическом осмотре?",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.last_visit)
+async def easy_quiz_3(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(last_visit=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.comfort)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Спокойно, доверяю врачам", callback_data="ec:Спокойно")
+    kb.button(text="Немного волнуюсь", callback_data="ec:Волнуюсь")
+    kb.button(text="Очень боюсь", callback_data="ec:Боюсь")
+    kb.adjust(1)
+    kb.row(types.InlineKeyboardButton(text="⬅️ Назад", callback_data="quiz_start")) # Можно усложнить и вернуть на шаг 2, но для легкости ведем в начало
+    
+    await callback.message.edit_text(
+        "<b>Шаг 3/4:</b> Как вы относитесь к посещению стоматолога?\n<i>(Мы подберем максимально комфортный подход)</i>",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.callback_query(EasyQuiz.comfort)
+async def easy_quiz_4(callback: types.CallbackQuery, state: FSMContext):
+    await state.update_data(comfort=callback.data.split(":")[1])
+    await state.set_state(EasyQuiz.contact)
+    
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🏠 В меню", callback_data="to_main")
+    
+    await callback.message.edit_text(
+        "<b>Шаг 4/4:</b> Почти готово! Оставьте ваш номер телефона, и наш куратор подберет удобное время для консультации.",
+        reply_markup=kb.as_markup(),
+        parse_mode="HTML"
+    )
+
+@dp.message(EasyQuiz.contact)
+async def easy_quiz_final(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    phone = message.text
+    
+    # Формируем отчет для админа
+    report = (
+        f"<b>💎 НОВАЯ КОНСУЛЬТАЦИЯ</b>\n"
+        f"👤 Клиент: {message.from_user.full_name}\n"
+        f"📞 Тел: {phone}\n"
+        f"🎯 Цель: {data.get('goal')}\n"
+        f"📅 Последний визит: {data.get('last_visit')}\n"
+        f"🧘 Состояние: {data.get('comfort')}\n"
+        f"ID: <code>{message.from_user.id}</code>"
+    )
+    
+    await bot.send_message(ADMIN_ID, report, parse_mode="HTML")
+    await state.clear()
+    
+    await message.answer(
+        "✅ <b>Спасибо за доверие!</b>\n\nМы получили ваши данные. Куратор клиники Elements свяжется с вами в ближайшее время, чтобы ответить на вопросы.",
+        reply_markup=main_kb(),
+        parse_mode="HTML"
+    )
+      
 
 
 # --- ЕДИНЫЙ ОБРАБОТЧИК (КЛИЕНТ <-> АДМИН) ---
