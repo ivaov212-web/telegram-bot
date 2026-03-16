@@ -98,8 +98,13 @@ def price_kb():
 
 
 @dp.callback_query(F.data == "menu_contacts")
-async def show_contacts(callback: types.CallbackQuery):
-    # Принудительно очищаем чат от старых сообщений или просто обновляем
+async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
+    # 1. Сначала ВСЕГДА отвечаем на колбэк, чтобы кнопка "отлипла"
+    await callback.answer()
+    
+    # 2. Сбрасываем любые состояния (на случай, если завис квиз)
+    await state.clear()
+    
     kb = InlineKeyboardBuilder()
     kb.button(text="📝 Записаться через квиз", callback_data="quiz_start")
     kb.button(text="💬 Написать администратору", url="https://t.me/elements_dental") 
@@ -117,11 +122,13 @@ async def show_contacts(callback: types.CallbackQuery):
         "• <b>Лично:</b> Позвоните нам или напишите администратору."
     )
     
-    await callback.answer() # Обязательно ответили
     try:
+        # Пытаемся заменить текст в текущем сообщении
         await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
     except Exception as e:
-        print(f"Ошибка в контактах: {e}") # Выведет ошибку в консоль, если она есть
+        # Если не вышло (например, сообщение старое), шлем новое
+        await callback.message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+
 
 
 
