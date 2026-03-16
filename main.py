@@ -100,8 +100,8 @@ def price_kb():
 
 @dp.callback_query(F.data == "show_contacts_now")
 async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
-    # Принт для проверки, доходит ли вообще сигнал от кнопки
-    print(f"DEBUG: Получен callback 'show_contacts_now' от пользователя {callback.from_user.id}")
+    # ВОТ ЭТОТ ПРИНТ:
+    print(">>> КНОПКА КОНТАКТЫ НАЖАТА! БОТ ПОЛУЧИЛ СИГНАЛ <<<")
     
     await callback.answer()
     await state.clear()
@@ -125,9 +125,8 @@ async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
     
     try:
         await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
-        print("DEBUG: Сообщение с контактами успешно обновлено.")
     except Exception as e:
-        print(f"DEBUG ERROR: Ошибка при редактировании сообщения: {e}")
+        print(f"Ошибка: {e}")
         await callback.message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
 
 # --- Исправленный универсальный обработчик ---
