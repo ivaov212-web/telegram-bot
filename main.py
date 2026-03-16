@@ -75,15 +75,16 @@ TECH_DETAILED = (
 
 # --- КЛАВИАТУРЫ ---
 
-def main_kb():
+def main_kb(): # Обязательно с маленькой 'd'
     kb = InlineKeyboardBuilder()
     kb.button(text="📝 Подобрать план лечения (Квиз)", callback_data="quiz_start")
     kb.button(text="💰 Услуги и прайс", callback_data="menu_price")
     kb.button(text="👨‍⚕️ Наши специалисты", callback_data="menu_team")
     kb.button(text="🏥 Технологии и оборудование", callback_data="menu_tech")
-    kb.button(text="📍 Контакты", callback_data="menu_contacts")
+    kb.button(text="📍 Контакты", callback_data="show_contacts_now") # Обновили ID кнопки
     kb.adjust(1)
     return kb.as_markup()
+
 
 def price_kb():
     kb = InlineKeyboardBuilder()
@@ -97,12 +98,12 @@ def price_kb():
     return kb.as_markup()
 
 
-@dp.callback_query(F.data == "menu_contacts")
+@dp.callback_query(F.data == "show_contacts_now")
 async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
-    # 1. Сначала ВСЕГДА отвечаем на колбэк, чтобы кнопка "отлипла"
-    await callback.answer()
+    # ВОТ ЭТОТ ПРИНТ:
+    print(">>> КНОПКА КОНТАКТЫ НАЖАТА! БОТ ПОЛУЧИЛ СИГНАЛ <<<")
     
-    # 2. Сбрасываем любые состояния (на случай, если завис квиз)
+    await callback.answer()
     await state.clear()
     
     kb = InlineKeyboardBuilder()
@@ -123,11 +124,11 @@ async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
     )
     
     try:
-        # Пытаемся заменить текст в текущем сообщении
         await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="HTML")
     except Exception as e:
-        # Если не вышло (например, сообщение старое), шлем новое
+        print(f"Ошибка: {e}")
         await callback.message.answer(text, reply_markup=kb.as_markup(), parse_mode="HTML")
+
 
 
 
