@@ -12,7 +12,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 # --- КОНФИГУРАЦИЯ ---
 import os
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 6807542444  # Твой ID для получения заявок
+ADMIN_ID = 6807542444 8116007308 # Твой ID для получения заявок
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -110,7 +110,7 @@ async def show_contacts(callback: types.CallbackQuery, state: FSMContext):
     kb.button(text="⬅️ Назад", callback_data="to_main")
     kb.adjust(1)
     
-    text = (
+        text = (
         "<b>📍 КОНТАКТЫ ELEMENTS</b>\n\n"
         "г. Донецк, пр-т Ильича, 17в\n"
         "🕒 <b>Режим работы:</b> Пн-Сб 9:00 - 19:00\n\n"
