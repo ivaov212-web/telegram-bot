@@ -12,7 +12,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 # --- КОНФИГУРАЦИЯ ---
 import os
 TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = 6807542444 8116007308 # Твой ID для получения заявок
+ADMIN_ID = 8116007308 # Твой ID для получения заявок
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
