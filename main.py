@@ -343,7 +343,7 @@ def kb_contacts() -> types.InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="📝  Записаться через квиз", callback_data="quiz_start"))
     kb.row(InlineKeyboardButton(text="💬  Написать администратору", url="https://t.me/elements_dental"))
-    kb.row(InlineKeyboardButton(text="📞  Позвонить: +7 (949) 307-15-85", url="tel:+79493071585"))
+    kb.row(InlineKeyboardButton(text="📞  Позвонить: +7 (949) 307-15-85", callback_data="show_phone"))
     kb.row(InlineKeyboardButton(text="🌐  Открыть сайт клиники", url="https://elements-dent.ru/"))
     kb.row(InlineKeyboardButton(text="⬅️  Главное меню", callback_data="to_main"))
     return kb.as_markup()
@@ -500,6 +500,10 @@ async def cb_team(callback: types.CallbackQuery):
 async def cb_tech(callback: types.CallbackQuery):
     await callback.answer()
     await safe_edit(callback.message, TECH_TEXT, reply_markup=kb_back_main())
+
+@dp.callback_query(F.data == "show_phone")
+async def cb_show_phone(callback: types.CallbackQuery):
+    await callback.answer("📞 +7 (949) 307-15-85", show_alert=True)
 
 
 @dp.callback_query(F.data == "menu_contacts")
